@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rtfm-config
+  labels:
+    app.kubernetes.io/name: rtfm-api
+data:
+  # Derived from what the dashboard renders (200 rows) plus headroom for
+  # client-side filtering - see ADR-005.
+  hotWindowSize: "500"
+  redisChannelPrefix: "rtfm"
