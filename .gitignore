@@ -1,0 +1,16 @@
+# Build output
+bin/
+obj/
+node_modules/
+dist/
+TestResults/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+
+# Source material for the assessment, not part of the deliverable.
+# These are large binaries (~14 MB) and one of them is the brief itself.
+docs/*.pdf

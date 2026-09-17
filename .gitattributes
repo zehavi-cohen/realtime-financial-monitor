@@ -1,0 +1,19 @@
+# Normalise line endings so a diff shows changed logic, not changed bytes.
+# Without this, a file written on Windows and read on Linux CI shows as
+# entirely rewritten, which makes a review useless.
+* text=auto eol=lf
+
+# Windows-only files that genuinely need CRLF.
+*.sln       text eol=crlf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binary: never normalise, never diff as text.
+*.pdf       binary
+*.png       binary
+*.jpg       binary
+*.ico       binary
+
+# Generated. Keeps the PR diff readable while still committing the lockfile.
+client/package-lock.json linguist-generated=true -diff
