@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rtfm-api
+  labels:
+    app.kubernetes.io/name: rtfm-api
+spec:
+  # Five replicas (S1). The application does not know this number and does not
+  # need to: no replica holds state another replica's clients need, and the
+  # SignalR Redis backplane means no replica addresses another (ADR-001, ADR-008).
+  replicas: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rtfm-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rtfm-api
+    spec:
+      # Graceful shutdown: the app drains in-flight requests on SIGTERM with a
+      # 15-second host shutdown timeout, so the grace period must exceed it.
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: rtfm-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: Storage__Mode
+              value: SqlRedis
+            - name: HotWindow__Size
+              valueFrom:
+                configMapKeyRef:
+                  name: rtfm-config
+                  key: hotWindowSize
+            - name: Redis__ChannelPrefix
+              valueFrom:
+                configMapKeyRef:
+                  name: rtfm-config
+                  key: redisChannelPrefix
+            # Connection strings are secrets, never ConfigMap entries and never
+            # baked into the image.
+            - name: SqlServer__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: rtfm-secrets
+                  key: sqlServerConnectionString
+            - name: Redis__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: rtfm-secrets
+                  key: redisConnectionString
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              # No CPU limit: throttling a request-serving process to make a
+              # scheduling number tidier turns a busy replica into a slow one.
+              # Memory is limited, because a leak must be killed, not tolerated.
+              memory: 512Mi
+          # Liveness asks only whether the process can still answer. It must not
+          # probe dependencies: restarting every replica because SQL Server is
+          # briefly slow converts a dependency blip into an outage.
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Readiness asks whether this replica can actually serve: SQL Server and
+          # Redis both reachable. A replica that cannot read the window cannot
+          # answer a dashboard's snapshot, so it should receive no traffic.
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Startup probe covers the schema initialiser waiting for SQL Server on a
+          # cold cluster, without loosening the liveness thresholds afterwards.
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        # readOnlyRootFilesystem needs somewhere writable for the runtime's
+        # temporary files.
+        - name: tmp
+          emptyDir: {}

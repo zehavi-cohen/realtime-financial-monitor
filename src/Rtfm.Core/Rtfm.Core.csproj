@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Rtfm.Core deliberately has ZERO PackageReference elements (S8).
+    The domain must stay independent of ASP.NET, SQL Server, Redis and even
+    Microsoft.Extensions.* - if a package creeps in here, the dependency
+    direction has been violated and the build should make that obvious.
+  -->
+
+</Project>

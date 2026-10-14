@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+.git/
+.vs/
+client/
+tests/
+docs/
+k8s/
+*.md
+*.sln

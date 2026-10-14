@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rtfm-api
+  labels:
+    app.kubernetes.io/name: rtfm-api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: rtfm-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  # No session affinity. The client skips negotiation and connects straight over
+  # WebSockets, so there is no negotiate-then-connect pair that has to land on the
+  # same replica, and no per-connection state on any replica for a client to come
+  # back to. Sticky sessions would only unbalance the five replicas.
+  sessionAffinity: None

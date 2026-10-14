@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);xUnit1031</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    This suite must not run under plain `dotnet test` (S6): it needs Docker, and a
+    developer without it should still get a green unit run.
+
+    MSBuild surfaces environment variables as properties, so clearing IsTestProject
+    takes this project out of `dotnet test` at the solution root unless the same
+    RTFM_INTEGRATION=1 that the test attributes look for is set. It still builds
+    with the solution, so it cannot silently rot.
+  -->
+  <PropertyGroup Condition="'$(RTFM_INTEGRATION)' != '1' AND '$(RTFM_INTEGRATION)' != 'true'">
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Rtfm.Core\Rtfm.Core.csproj" />
+    <ProjectReference Include="..\..\src\Rtfm.Infrastructure\Rtfm.Infrastructure.csproj" />
+    <!-- The contract suite lives with the unit tests and is run here unchanged. -->
+    <ProjectReference Include="..\Rtfm.Tests\Rtfm.Tests.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.0.2" />
+    <PackageReference Include="FluentAssertions" Version="7.2.0" />
+    <PackageReference Include="Testcontainers.MsSql" Version="4.1.0" />
+    <PackageReference Include="Testcontainers.Redis" Version="4.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="FluentAssertions" />
+  </ItemGroup>
+
+</Project>

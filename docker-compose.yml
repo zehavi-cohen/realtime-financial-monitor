@@ -1,0 +1,85 @@
+# The full topology: api + sqlserver + redis.
+#
+# `docker compose up` is intended to yield a working system on the first attempt,
+# so the dependency ordering here is on health, not on start: SQL Server accepts
+# TCP well before it will accept a login, and `depends_on: service_started` would
+# hand the API a database that rejects it.
+
+name: rtfm
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Storage__Mode: SqlRedis
+      # Double underscore is the configuration provider's section separator, so
+      # these bind to the same strongly-typed options as appsettings.json.
+      SqlServer__ConnectionString: >-
+        Server=sqlserver,1433;Database=rtfm;User Id=sa;Password=${MSSQL_SA_PASSWORD:-Rtfm!Local!2024};
+        TrustServerCertificate=True;Encrypt=False;Connect Timeout=30
+      Redis__ConnectionString: redis:6379
+      Redis__ChannelPrefix: rtfm
+      HotWindow__Size: "500"
+      # The dev client runs on the Vite server at 5173 and talks to this API.
+      Cors__AllowedOrigins__0: http://localhost:5173
+      Cors__AllowedOrigins__1: http://127.0.0.1:5173
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Rtfm!Local!2024}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      # A successful login, not an open port. -C trusts the container's self-signed
+      # certificate, which is what the tools 18 client requires.
+      test:
+        - CMD-SHELL
+        - >-
+          /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa
+          -P "${MSSQL_SA_PASSWORD:-Rtfm!Local!2024}" -C -Q "SELECT 1" -b -o /dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    # appendonly keeps the hot window across a container restart. It is not
+    # required for correctness - the window rebuilds from SQL Server either way -
+    # but it makes a local restart quiet rather than a rebuild storm.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  sqlserver-data:
+  redis-data:
