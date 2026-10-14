@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react';
  * there is no CORS and no credentialed cross-origin WebSocket to configure.
  * `ws: true` is required: without it the SignalR upgrade request 404s and the
  * client silently falls back - except that it cannot, because it is configured to
- * skip negotiation (S5.2).
+ * skip negotiation.
  */
 export default defineConfig({
   plugins: [react()],

@@ -2,7 +2,7 @@ import { HttpTransportType, HubConnection, HubConnectionBuilder, LogLevel } from
 import type { Transaction } from '../types/transaction';
 
 /**
- * The hub connection, built in one place (S10). Components never touch SignalR.
+ * The hub connection, built in one place. Components never touch SignalR.
  */
 
 const HUB_URL = '/hub/transactions';
@@ -24,7 +24,7 @@ export function createTransactionsConnection(): HubConnection {
         // supports and get a connection token. Skipping it removes a round trip
         // and, more importantly here, removes the need for sticky sessions across
         // the five replicas: without a negotiate step there is no per-connection
-        // state on any one replica to come back to (S7).
+        // state on any one replica to come back to.
         //
         // The cost is that there is no fallback: WebSockets or nothing. Recorded
         // in the README as a deliberate trade-off.

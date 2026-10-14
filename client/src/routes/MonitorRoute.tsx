@@ -11,7 +11,7 @@ type Filter = 'all' | 'failed';
 
 /**
  * The dashboard. It opens already populated from the connection snapshot and
- * updates from the same stream thereafter (S5.2).
+ * updates from the same stream thereafter.
  */
 export function MonitorRoute(): JSX.Element {
   const { transactions, connectionState, error } = useTransactionStream();
@@ -24,7 +24,7 @@ export function MonitorRoute(): JSX.Element {
    *
    * The filter runs here, over data already in memory. It is never a server call -
    * a request per keystroke on a dashboard that already holds the answer is how a
-   * filter control turns into a load test (S5.2).
+   * filter control turns into a load test.
    */
   const visible = useMemo<readonly Transaction[]>(() => {
     const all = Array.from(transactions.values());

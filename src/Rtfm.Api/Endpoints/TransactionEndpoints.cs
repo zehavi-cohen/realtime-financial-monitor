@@ -6,7 +6,7 @@ namespace Rtfm.Api.Endpoints;
 
 /// <summary>
 /// The ingestion endpoint. It translates HTTP into a domain call and a domain
-/// result into HTTP, and holds no rules of its own (S10).
+/// result into HTTP, and holds no rules of its own.
 /// </summary>
 public static class TransactionEndpoints
 {
@@ -51,7 +51,7 @@ public static class TransactionEndpoints
 
         // Ingestion outcome is a meaningful boundary and is logged once per request.
         // Per-message noise below this level is what makes a log unreadable at
-        // several hundred transactions a second (S10).
+        // several hundred transactions a second.
         logger.LogInformation(
             "Transaction {TransactionId} ingested: {Result}, status {Status}.",
             transaction.TransactionId,

@@ -1,5 +1,5 @@
 /**
- * The transaction contract, declared once for the whole client (S10).
+ * The transaction contract, declared once for the whole client.
  *
  * This is the shape the API returns and the shape the hub pushes; they are the
  * same DTO server-side, and keeping one type here is what makes a snapshot entry

@@ -36,7 +36,7 @@ public sealed record CreateTransactionRequest
 /// <summary>
 /// The wire representation of a transaction, used by both the REST response and
 /// the hub. Explicit and separate from the domain record: the domain type is free
-/// to change shape, the contract is not (S10).
+/// to change shape, the contract is not.
 /// </summary>
 public sealed record TransactionDto
 {

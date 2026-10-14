@@ -18,7 +18,7 @@ namespace Rtfm.Infrastructure;
 /// </summary>
 public static class InfrastructureServiceCollectionExtensions
 {
-    /// <summary>Health check tag for the readiness probe (S7).</summary>
+    /// <summary>Health check tag for the readiness probe.</summary>
     public const string ReadinessTag = "ready";
 
     public static IServiceCollection AddRtfmInfrastructure(this IServiceCollection services, IConfiguration configuration)
@@ -28,7 +28,7 @@ public static class InfrastructureServiceCollectionExtensions
 
         // Options are bound and validated at startup, not on first use: a missing
         // connection string should fail the process while it is still starting,
-        // where an orchestrator will notice, rather than the first request (S10).
+        // where an orchestrator will notice, rather than the first request.
         services.AddOptions<StorageOptions>()
             .Bind(configuration.GetSection(StorageOptions.SectionName))
             .ValidateDataAnnotations()

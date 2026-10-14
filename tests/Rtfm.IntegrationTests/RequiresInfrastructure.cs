@@ -1,7 +1,7 @@
 namespace Rtfm.IntegrationTests;
 
 /// <summary>
-/// The gate that keeps this suite out of <c>dotnet test</c> (S6).
+/// The gate that keeps this suite out of <c>dotnet test</c>.
 /// </summary>
 /// <remarks>
 /// Opt-in by environment variable rather than a trait filter, because a trait only

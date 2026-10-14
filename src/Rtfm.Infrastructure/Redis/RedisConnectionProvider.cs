@@ -41,8 +41,13 @@ public sealed class RedisConnectionProvider : IRedisConnectionProvider, IAsyncDi
 
     public async Task<IConnectionMultiplexer> GetAsync(CancellationToken cancellationToken)
     {
+        // Deliberately not checking IsConnected here. The multiplexer reconnects
+        // itself, so a disconnected one is still the right object to hand back -
+        // and gating on IsConnected would send every caller through the semaphore
+        // below for the whole duration of a Redis outage, serialising the entire
+        // request path at exactly the moment the system is already degraded.
         var existing = _multiplexer;
-        if (existing is { IsConnected: true })
+        if (existing is not null)
         {
             return existing;
         }

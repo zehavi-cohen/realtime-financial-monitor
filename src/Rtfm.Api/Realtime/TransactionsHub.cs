@@ -57,7 +57,7 @@ public sealed class TransactionsHub : Hub<ITransactionsClient>
         // loses it silently: the dashboard shows a window that is simply missing
         // rows, with nothing to indicate it. Subscribe-then-snapshot can deliver the
         // same transaction twice, which the client neutralises for free because its
-        // state is a Map keyed on transactionId (S5.2).
+        // state is a Map keyed on transactionId.
         //
         // Do not "fix" this by synchronising the two streams server-side: every
         // mechanism for that adds latency to all traffic to serve one edge case.

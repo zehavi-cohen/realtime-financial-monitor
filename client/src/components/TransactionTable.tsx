@@ -8,7 +8,7 @@ interface TransactionTableProps {
 
 /**
  * Pure presentation: it receives the already-sorted, already-filtered, already-
- * bounded array and renders it. No hooks, no fetching, no SignalR (S5.2).
+ * bounded array and renders it. No hooks, no fetching, no SignalR.
  */
 export function TransactionTable({ transactions, totalCount }: TransactionTableProps): JSX.Element {
   if (transactions.length === 0) {

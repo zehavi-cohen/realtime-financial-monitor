@@ -1,136 +1,148 @@
 # Implementation notes
 
-Per §1 of the build prompt, the architectural decisions in §4 were implemented as
-specified. This file records the places where the implementation adds to or
-narrows a specified detail, with the reasoning, so a reviewer comparing the code
-against §4 does not have to work out whether a difference was intentional.
+Places where the implementation adds to, narrows, or departs from the most
+obvious reading of the requirements — each with the reasoning, so a reviewer
+comparing the code against the spec does not have to work out whether a
+difference was intentional.
 
-None of these change an architectural decision. Where I disagreed with something,
-it is noted as an objection and implemented as written anyway.
+The two larger deviations (SQL Server as the system of record, `Completed`
+rather than `Success`) are in the README under
+[Deliberate deviations](README.md#deliberate-deviations). The architectural
+decisions themselves are in [`docs/adr/README.md`](docs/adr/README.md).
 
 ---
 
 ## 1. `201 Created` is returned only when a row was created
 
-**Specified (§4.2):** `validate -> SQL Server UPSERT -> Redis window update ->
-SignalR broadcast -> 201 Created`.
-
-**Implemented:** the ordering is exactly as specified. The status code is `201
-Created` for `IngestResult.Created`, and `200 OK` for `Updated` and `Ignored`. Every
-response carries the outcome in its body:
+The ingestion path ends in `201 Created`. The status code here is `201` for
+`IngestResult.Created`, and `200 OK` for `Updated` and `Ignored`. Every response
+carries the outcome in its body:
 
 ```json
-{ "result": "Created" | "Updated" | "Ignored", "transaction": { ... } }
+{ "result": "Created" | "Updated" | "Ignored", "transactionId": "...", "transaction": { ... } }
 ```
 
-**Reasoning.** I read the `201 Created` in §4.2 as the terminal step of the happy
-path rather than as a statement about all three outcomes. Answering `201 Created` to
-a late duplicate that created nothing is an assertion the system cannot support, and
-producers' retry logic reads status codes: a client distinguishing "my retry was
-accepted as new" from "my retry was a no-op" would be misled by a uniform `201`.
-The `result` field makes the distinction explicit either way, so nothing is lost by
-also making the status code honest.
+**Reasoning.** Answering `201 Created` to a late duplicate that created nothing
+is an assertion the system cannot support, and producers' retry logic reads
+status codes: a client distinguishing "my retry was accepted as new" from "my
+retry was a no-op" would be misled by a uniform `201`. The `result` field makes
+the distinction explicit either way, so nothing is lost by also making the status
+code honest.
 
-If a reviewer wants a uniform `201`, it is one line in
-`TransactionEndpoints.IngestAsync`.
+It is one line in `TransactionEndpoints.IngestAsync` if a uniform `201` is wanted.
 
----
+## 2. An `Ignored` response omits the transaction body
 
-## 2. The hot-window TTL is applied alongside the Lua script, not inside it
+`Ignored` returns `result` and `transactionId` but no `transaction`.
 
-**Specified (§4.5):** the Lua script exactly as given, *and* "TTL of 24h on both
-keys".
+**Reasoning.** On `Created` and `Updated` the submitted values are exactly what
+the `MERGE` wrote, so echoing them is accurate. On `Ignored` nothing was written,
+and echoing the submission back under the name `transaction` would tell a
+producer that a rejected status change had been stored. Reading the real stored
+row instead would cost a query on the one path whose whole point is that it did
+no work.
 
-The script as specified contains no `EXPIRE`, so the two requirements do not meet.
+## 3. The hot-window TTL is applied alongside the Lua script, not inside it
 
-**Implemented:** the script is byte-for-byte as specified. The TTL is applied by two
-`PEXPIRE` commands issued immediately after the `EVALSHA` with
-`CommandFlags.FireAndForget` (`RedisHotWindow.ApplyTtl`).
+The maintenance script is implemented exactly as specified and contains no
+`EXPIRE`. The 24-hour TTL is applied by two `PEXPIRE` commands issued immediately
+after the `EVALSHA`, with `CommandFlags.FireAndForget` (`RedisHotWindow.ApplyTtl`).
 
-**Reasoning.** Adding the `EXPIRE` calls inside the script would have changed a
-statement that §1 says is already decided, and the atomicity argument in §4.5 is
-about the trim sequence, not about the TTL. Issuing them fire-and-forget pipelines
-them behind the script call, so there is no extra round trip, and losing the
-acknowledgement costs nothing: the TTL is a safety net against abandoned keys, not a
-correctness property. The rebuild path sets the same TTL inside its batch.
+**Reasoning.** The atomicity argument for the script is about the trim sequence,
+not about the TTL, so there was no reason to modify a statement whose exact shape
+carries a concurrency guarantee. Fire-and-forget pipelines the two commands behind
+the script call, so there is no extra round trip, and losing the acknowledgement
+costs nothing: the TTL is a safety net against abandoned keys, not a correctness
+property. The rebuild path sets the same TTL inside its batch.
 
----
+## 4. Validation is stricter than the stated rules in two places
 
-## 3. Validation is stricter than §6 requires, in two places
+Required: negative or zero amount, unknown status, empty id, malformed timestamp,
+unknown currency format. All implemented, plus:
 
-**Specified (§6):** "negative or zero amount, unknown status, empty id, malformed
-timestamp, unknown currency format".
+- **Amount scale.** An amount with more than four decimal places is rejected
+  rather than rounded to fit `DECIMAL(19,4)`. Silently truncating money is the
+  class of bug found a year later during a reconciliation. An amount beyond 15
+  integral digits is rejected for the same reason — it would overflow the column.
+- **`Guid.Empty`.** `00000000-0000-0000-0000-000000000000` parses as a GUID but
+  means "unset". Accepting it would collapse every producer that forgot to assign
+  an id onto a single row, and that row would then have a lifecycle.
 
-**Implemented:** all of those, plus two additions.
+Both are additive: nothing that must be accepted is rejected.
 
-- **Amount scale.** An amount with more than four decimal places is rejected rather
-  than rounded to fit `DECIMAL(19,4)`. Silently truncating money is the class of bug
-  that is found a year later during a reconciliation. An amount beyond 15 integral
-  digits is rejected for the same reason — it would overflow the column.
-- **`Guid.Empty`.** `00000000-0000-0000-0000-000000000000` parses as a GUID but means
-  "unset". Accepting it would collapse every producer that forgot to assign an id
-  onto a single row, and that row would then have a lifecycle.
+## 5. `status` is matched exactly, not parsed as an enum
 
-Both are additive: nothing §6 requires to be accepted is rejected.
+An explicit `switch` over the three strings rather than `Enum.TryParse`.
 
----
+**Reasoning.** `Enum.TryParse` also accepts the numeric forms — `"0"`, `"1"`,
+`"2"` — and, with `ignoreCase`, any casing. Either would widen the wire contract
+beyond "exactly these three values" by accident. There is a test for `"1"`
+specifically, so this cannot regress unnoticed.
 
-## 4. `status` is matched exactly, not parsed as an enum
+The consequence is that `"completed"` is a `400`. That is documented in the
+README's API contract.
 
-**Specified (§3):** "`status` is exactly these three values."
+## 6. The integration suite is excluded from `dotnet test` by MSBuild, not only by attribute
 
-**Implemented:** an explicit `switch` over the three strings rather than
-`Enum.TryParse`.
+The suite must not run under plain `dotnet test`. Two gates:
 
-**Reasoning.** `Enum.TryParse` also accepts the numeric forms — `"0"`, `"1"`, `"2"`
-— and, with `ignoreCase`, any casing. Either would widen the wire contract beyond
-"exactly these three values" by accident. There is a test for `"1"` specifically, so
-this cannot regress unnoticed.
-
-The consequence is that `"completed"` is a `400`. That is the stricter reading of
-§3, and it is documented in the README's API contract.
-
----
-
-## 5. The integration suite is excluded from `dotnet test` by MSBuild, not only by attribute
-
-**Specified (§6):** the integration suite "must not run under plain `dotnet test`".
-
-**Implemented:** two gates.
-
-- The tests specific to real infrastructure use `[RequiresInfrastructureFact]`,
-  which sets `Skip` unless `RTFM_INTEGRATION=1`.
-- `Rtfm.IntegrationTests.csproj` clears `IsTestProject` unless the same variable is
-  set, which removes it from `dotnet test` at the solution root entirely.
+- Tests specific to real infrastructure use `[RequiresInfrastructureFact]`, which
+  sets `Skip` unless `RTFM_INTEGRATION=1`.
+- `Rtfm.IntegrationTests.csproj` clears `IsTestProject` unless the same variable
+  is set, which removes it from `dotnet test` at the solution root entirely.
 
 **Reasoning.** The attribute alone is not sufficient. The SQL/Redis run of the
 shared contract suite inherits its `[Fact]` attributes from the base class in
 `Rtfm.Tests`, so those cannot be skipped by an attribute on the derived class
-without duplicating every test. The MSBuild gate covers them, and it still builds
-with the solution, so the suite cannot silently rot.
+without duplicating every test. The MSBuild gate covers them, and the project
+still builds with the solution, so the suite cannot silently rot.
+
+## 7. The simulator has a third button: "Send lifecycle"
+
+The simulator is specified as a form plus "Generate random" and "Send 100 rapid".
+A third button sends a `Pending` transaction and then, a second and a half later,
+the **same `transactionId`** with a terminal status.
+
+**Reasoning.** Without it the status-change animation and the repeated-id rule -
+both required behaviour - have no path to being seen from the UI at all: every
+other control mints a fresh id, so the dashboard only ever renders arrivals. This
+button is the one way to watch the server answer `Updated` rather than `Created`
+and the row transition in place instead of a second row appearing. It is a
+demonstration of required behaviour, not new behaviour.
+
+## 8. The runtime image is `aspnet:9.0`, not `aspnet:9.0-alpine`
+
+The Alpine variant would be meaningfully smaller and ships BusyBox `wget`, which
+would remove the `apt-get install curl` layer that exists only so the Compose
+healthcheck can call `/health/ready`. `InvariantGlobalization` is already enabled,
+so the usual Alpine pitfall does not apply.
+
+It was not taken because it could not be verified: there is no Docker on the
+machine this was built on, and swapping the base OS of the one artifact that has
+to work on the first `docker compose up` is not a change to ship untested. It is
+a one-line change for anyone who can run the image once.
+
+## 9. `Currency` is validated for format only
+
+`CHAR(3)` and three upper-case ASCII letters is a format check, not membership of
+ISO 4217 — validating against the real list needs a list, and a list needs an
+owner and an update process. Recorded in the README under Known limitations.
 
 ---
 
-## 6. `Currency` is validated for format only
-
-The brief stores a currency and never uses it. `CHAR(3)` and three upper-case ASCII
-letters is a format check, not membership of ISO 4217 — validating against the real
-list needs a list, and a list needs an owner and an update process. Recorded in the
-README under known limitations.
-
----
-
-## 7. Objections
+## Objections
 
 One, and it is minor.
 
-**The `cache:rebuild` guard is specified as `SET cache:rebuild 1 NX PX 10000`**
-(§4.5) — a constant value with no owner token. A replica that takes the lock,
-exceeds 10 seconds, and then releases it would be deleting a lock another replica
-now holds. Implemented as specified, and made safe by never releasing it: the key is
-allowed to expire. That works because the rebuild is idempotent and because once the
-winner has finished, nobody else needs the lock — their reads find a populated
-window. Documented in ADR-006.
+**The rebuild guard is a constant value with no owner token** —
+`SET cache:rebuild 1 NX PX 10000`. A replica that takes the lock, exceeds ten
+seconds, and then releases it would be deleting a lock another replica now holds.
+
+Implemented as specified, and made safe by never releasing it: the key is allowed
+to expire. That works because the rebuild is idempotent, and because once the
+winner has finished nobody else needs the lock — their reads find a populated
+window. Documented in
+[ADR-006](docs/adr/README.md#adr-006--no-refresh-policy-rebuild-on-miss-and-a-ttl).
 
 If the rebuild ever stops being idempotent, this needs a token and a
 compare-and-delete release script.

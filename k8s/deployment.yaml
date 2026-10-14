@@ -5,7 +5,7 @@ metadata:
   labels:
     app.kubernetes.io/name: rtfm-api
 spec:
-  # Five replicas (S1). The application does not know this number and does not
+  # Five replicas. The application does not know this number and does not
   # need to: no replica holds state another replica's clients need, and the
   # SignalR Redis backplane means no replica addresses another (ADR-001, ADR-008).
   replicas: 5

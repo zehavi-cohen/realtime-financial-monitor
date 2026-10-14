@@ -45,6 +45,6 @@ function TransactionRowComponent({ transaction }: TransactionRowProps): JSX.Elem
  * Memoised and keyed by id in the parent. One arriving transaction re-renders one
  * row; the other 199 are reference-equal and skipped. Without this, every flush
  * re-renders the whole table, and the "send 100 rapid" case is where that becomes
- * visible as dropped input (S5.2).
+ * visible as dropped input.
  */
 export const TransactionRow = memo(TransactionRowComponent);

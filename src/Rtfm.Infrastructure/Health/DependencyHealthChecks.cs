@@ -7,7 +7,7 @@ namespace Rtfm.Infrastructure.Health;
 
 /// <summary>
 /// Readiness for SQL Server. A replica that cannot reach the system of record
-/// cannot serve an ingestion, so it must not receive traffic (S7).
+/// cannot serve an ingestion, so it must not receive traffic.
 /// </summary>
 public sealed class SqlServerHealthCheck : IHealthCheck
 {
