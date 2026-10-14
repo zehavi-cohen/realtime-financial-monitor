@@ -2,8 +2,8 @@ import type { CreateTransactionRequest, IngestionResponse } from '../types/trans
 
 /**
  * Every HTTP call the client makes, in one module. Components never call fetch
- * (S10): the error shape, the URL and the headers are decided here once, so a
- * change to the contract touches one file.
+ * themselves: the error shape, the URL and the headers are decided here once, so
+ * a change to the contract touches one file.
  */
 
 const ENDPOINT = '/api/transactions';

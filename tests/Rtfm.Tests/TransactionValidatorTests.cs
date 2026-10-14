@@ -91,7 +91,7 @@ public sealed class TransactionValidatorTests
     }
 
     [Theory]
-    [InlineData("Success")]      // the brief's UI wording; not part of the data model
+    [InlineData("Success")]      // a plausible synonym for Completed; not part of the contract
     [InlineData("completed")]    // exact casing is part of the contract
     [InlineData("1")]            // Enum.TryParse would have accepted this
     [InlineData("")]

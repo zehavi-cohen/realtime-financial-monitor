@@ -8,12 +8,15 @@ import type { CreateTransactionRequest, TransactionStatus } from '../types/trans
  *
  * It never touches SignalR. A producer posts over HTTP and learns nothing about
  * who is watching; wiring the form to the hub would collapse two roles that the
- * whole architecture keeps apart (S5.1).
+ * whole architecture keeps apart.
  */
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'ILS', 'JPY'] as const;
 
 const RAPID_BATCH_SIZE = 100;
+
+/** Pause between the Pending send and the terminal send in the lifecycle demo. */
+const LIFECYCLE_DELAY_MS = 1_500;
 
 /** Matches the server's rule, so the obvious mistakes never leave the browser. */
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
@@ -95,6 +98,58 @@ export function AddRoute(): JSX.Element {
     setForm(randomForm());
   }, []);
 
+  /**
+   * Sends a Pending transaction, then the same transactionId again with a terminal
+   * status.
+   *
+   * Without this there is no way to see a status change from the UI at all: every
+   * other control mints a fresh id, so the dashboard only ever sees arrivals. This
+   * is the one path that exercises the repeated-id rule end to end - the server
+   * answers Updated rather than Created, and the row transitions in place rather
+   * than a second row appearing.
+   */
+  const handleLifecycle = useCallback(async () => {
+    setBusy(true);
+    setFieldErrors({});
+
+    try {
+      const generated = randomForm();
+      const amount = Number(generated.amount);
+
+      // One id, reused. That is the entire point of the demonstration.
+      const transactionId = crypto.randomUUID();
+      const timestamp = new Date().toISOString();
+
+      const pending = await send({
+        transactionId,
+        amount,
+        currency: generated.currency,
+        status: 'Pending',
+        timestamp,
+      });
+
+      if (!pending) {
+        return;
+      }
+
+      // Long enough for the arrival to render and settle before the transition,
+      // so the two animations read as two separate events rather than one.
+      await new Promise((resolve) => setTimeout(resolve, LIFECYCLE_DELAY_MS));
+
+      await send({
+        transactionId,
+        amount,
+        currency: generated.currency,
+        status: Math.random() < 0.5 ? 'Completed' : 'Failed',
+        // The producer's timestamp moves with the status change; OccurredAt is
+        // what the dashboard orders by, so the row rises to the top.
+        timestamp: new Date().toISOString(),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }, [send]);
+
   const handleRapid = useCallback(async () => {
     setBusy(true);
     setFieldErrors({});
@@ -102,7 +157,7 @@ export function AddRoute(): JSX.Element {
     try {
       // Fired together rather than in sequence. The point of this button is to put
       // the dashboard's buffered rendering under a burst, and a sequential loop
-      // paced by round trips would not produce one (S13).
+      // paced by round trips would not produce one.
       const requests = Array.from({ length: RAPID_BATCH_SIZE }, () => {
         const generated = randomForm();
         return toRequest(Number(generated.amount), generated.currency, generated.status);
@@ -194,6 +249,9 @@ export function AddRoute(): JSX.Element {
           </button>
           <button type="button" onClick={() => void handleRapid()} disabled={busy}>
             Send {RAPID_BATCH_SIZE} rapid
+          </button>
+          <button type="button" onClick={() => void handleLifecycle()} disabled={busy}>
+            Send lifecycle
           </button>
         </div>
       </form>

@@ -8,7 +8,7 @@ export interface TransactionStream {
   /**
    * Keyed by transactionId. A repeated transaction overwrites itself, which makes
    * snapshot/stream overlap, status transitions, reconnect re-snapshots and any
-   * duplicate delivery harmless (S5.2). This is the client half of the
+   * duplicate delivery harmless. This is the client half of the
    * subscribe-before-snapshot decision, and the reason the server needs no
    * deduplication at all.
    */
@@ -43,7 +43,7 @@ const TRIM_THRESHOLD = Math.floor(MAX_TRACKED * 1.5);
 
 /**
  * Owns the connection and the inbound buffer. All of the real-time machinery is
- * here; everything that renders receives plain data as props (S5.2).
+ * here; everything that renders receives plain data as props.
  */
 export function useTransactionStream(): TransactionStream {
   const [transactions, setTransactions] = useState<ReadonlyMap<string, Transaction>>(() => new Map());

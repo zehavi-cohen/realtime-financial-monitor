@@ -21,7 +21,31 @@ dotnet_style_qualification_for_field = false:warning
 dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
 dotnet_style_readonly_field = true:warning
 
-# Naming: private fields are _camelCase
+# Naming.
+#
+# Roslyn applies the FIRST rule whose symbol specification matches, so order is
+# significant here. Constants and static readonly members are "fields" as far as
+# the analyzer is concerned, so they have to be claimed by their own rules before
+# the general private-field rule can demand an underscore of them.
+dotnet_diagnostic.IDE1006.severity = warning
+
+# 1. Constants are PascalCase, whatever their accessibility.
+dotnet_naming_rule.constants_pascal_case.severity = warning
+dotnet_naming_rule.constants_pascal_case.symbols = constants
+dotnet_naming_rule.constants_pascal_case.style = pascal_case
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.applicable_accessibilities = *
+dotnet_naming_symbols.constants.required_modifiers = const
+
+# 2. static readonly is PascalCase too - it is a constant that needed a constructor.
+dotnet_naming_rule.static_readonly_pascal_case.severity = warning
+dotnet_naming_rule.static_readonly_pascal_case.symbols = static_readonly_fields
+dotnet_naming_rule.static_readonly_pascal_case.style = pascal_case
+dotnet_naming_symbols.static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_fields.applicable_accessibilities = *
+dotnet_naming_symbols.static_readonly_fields.required_modifiers = static,readonly
+
+# 3. Everything else private is instance state: _camelCase.
 dotnet_naming_rule.private_fields_underscore.severity = warning
 dotnet_naming_rule.private_fields_underscore.symbols = private_fields
 dotnet_naming_rule.private_fields_underscore.style = underscore_prefix
@@ -29,6 +53,8 @@ dotnet_naming_symbols.private_fields.applicable_kinds = field
 dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 dotnet_naming_style.underscore_prefix.required_prefix = _
 dotnet_naming_style.underscore_prefix.capitalization = camel_case
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
 
 # Async correctness -- these are the ones that matter for this codebase (S10).
 dotnet_diagnostic.CA2007.severity = none      # ConfigureAwait: not needed, no sync ctx in ASP.NET Core

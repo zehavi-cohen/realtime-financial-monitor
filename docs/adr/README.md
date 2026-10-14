@@ -1,10 +1,10 @@
 # Architecture Decision Records
 
-One record per decision in §4 of the build brief. Each states the context, the
+One record per architectural decision in this system. Each states the context, the
 decision, the alternatives that were considered and why each was rejected, and the
 consequences — including the ones that cost something.
 
-These are the answer to the brief's distributed-architecture question. They are
+These are the reasoning behind the distributed architecture. They are
 meant to be read as closely as the code.
 
 | ADR | Decision |
@@ -63,7 +63,7 @@ Server answers in one statement (ADR-003).
 - Every read of shared state is a network hop. The hot window exists to make the
   common one cheap.
 - Redis and SQL Server are hard dependencies on the serving path. Readiness probes
-  reflect that (S7), and the README records Redis as a single point of failure.
+  reflect that, and the README records Redis as a single point of failure.
 
 ---
 
@@ -401,7 +401,7 @@ correctness, so `SET NX PX` is exactly the right weight of tool.
 
 ### Context
 
-The brief asks for RAM storage that is thread-safe and free of race conditions. A
+The requirement is RAM storage that is thread-safe and free of race conditions. A
 system of record that only exists in RAM is not one — a restart loses every
 transaction, which is the failure ADR-002 exists to prevent. Both requirements are
 legitimate and they are not the same requirement.
@@ -424,7 +424,7 @@ public interface ITransactionStore
 Selected by one configuration value. No other component knows which is active.
 
 The in-memory implementation is a **first-class implementation, not a stub**. It
-satisfies the brief's literal requirement, it is what the concurrency tests
+satisfies the in-memory storage requirement in full, it is what the concurrency tests
 exercise, and it is what makes `dotnet test` require no infrastructure. Both are
 verified against the same contract test suite.
 
@@ -445,7 +445,7 @@ all.
 ### Consequences
 
 - `dotnet test` runs with no Docker, no Redis and no database, in seconds.
-- The in-memory store's window is bounded, so it is also the brief's RAM store with
+- The in-memory store's window is bounded, so it is a RAM store with
   an eviction policy rather than an unbounded leak.
 - Anything the contract suite cannot express is, by definition, not part of the
   contract. Lua atomicity and rebuild-on-miss are therefore in the separate

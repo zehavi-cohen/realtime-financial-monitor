@@ -3,7 +3,7 @@ import { AddRoute } from './routes/AddRoute';
 import { MonitorRoute } from './routes/MonitorRoute';
 
 /**
- * Two routes, sharing nothing but the transaction type (S5). The simulator speaks
+ * Two routes, sharing nothing but the transaction type. The simulator speaks
  * HTTP only; the dashboard speaks the hub only.
  */
 export function App(): JSX.Element {

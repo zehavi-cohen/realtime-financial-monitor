@@ -82,7 +82,7 @@ if (allowedOrigins.Length > 0)
 }
 
 // Drain in-flight requests instead of cutting them off. A rolling deployment of
-// five replicas otherwise fails a handful of ingestions per rollout (S7).
+// five replicas otherwise fails a handful of ingestions per rollout.
 builder.Services.Configure<HostOptions>(options =>
 {
     options.ShutdownTimeout = TimeSpan.FromSeconds(15);
