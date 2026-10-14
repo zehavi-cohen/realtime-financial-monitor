@@ -66,7 +66,7 @@ kubectl apply -f k8s/
 
 ## How a transaction flows
 
-![Ingestion flow](docs/images/flow.svg)
+![Ingestion flow](docs/images/flow.png)
 
 The order is a correctness decision, not a performance detail. A transaction is
 never pushed to an agent's screen unless it is already durable — an agent acting
